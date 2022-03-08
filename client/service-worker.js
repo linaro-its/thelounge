@@ -3,7 +3,8 @@
 "use strict";
 
 const cacheName = "__HASH__";
-const excludedPathsFromCache = /^(?:socket\.io|storage|uploads|cdn-cgi)\//;
+const includedPathsInCache = /^(js|css|img|themes|favicon\.ico|fonts|#|\/)\/*/;
+let is401 = false;
 
 self.addEventListener("install", function () {
 	self.skipWaiting();
@@ -38,12 +39,26 @@ self.addEventListener("fetch", function (event) {
 
 	const path = url.substring(scope.length);
 
-	// Skip ignored paths
-	if (excludedPathsFromCache.test(path)) {
+	if (!includedPathsInCache.test(path)) {
 		return;
 	}
 
-	event.respondWith(networkOrCache(event));
+	const response = networkOrCache(event);
+
+	if (is401) {
+		self.registration.then(function (reg) {
+			if (reg) {
+				reg.unregister().then(function () {
+					window.location.reload(true);
+				});
+			} else {
+				window.location.reload(true);
+			}
+		});
+		return;
+	}
+
+	event.respondWith(response);
 });
 
 async function putInCache(request, response) {
@@ -84,6 +99,13 @@ async function networkOrCache(event) {
 
 			return response.clone();
 		}
+
+		if (response.status === 401) {
+			is401 = true;
+			return response.clone();
+		}
+
+		is401 = false;
 
 		throw new Error(`Request failed with HTTP ${response.status}`);
 	} catch (e) {

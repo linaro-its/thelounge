@@ -22,7 +22,10 @@ socket.on("auth:failed", function () {
 	showSignIn();
 });
 
-socket.on("auth:start", function (serverHash) {
+socket.on("auth:start", function (data) {
+	const serverHash = data.serverHash;
+	const headerAuthEnabled = data.headerAuthEnabled;
+
 	// If we reconnected and serverHash differs, that means the server restarted
 	// And we will reload the page to grab the latest version
 	if (lastServerHash && serverHash !== lastServerHash) {
@@ -69,6 +72,8 @@ socket.on("auth:start", function (serverHash) {
 			openChannel,
 			hasConfig: store.state.serverConfiguration !== null,
 		});
+	} else if (headerAuthEnabled) {
+		socket.emit("auth:perform", {});
 	} else {
 		showSignIn();
 	}

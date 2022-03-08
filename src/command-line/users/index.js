@@ -1,6 +1,7 @@
 "use strict";
+const Helper = require("../../helper");
 
-if (!require("../../helper").config.ldap.enable) {
+if (!Helper.config.ldap.enable && !Helper.config.headerAuth.enable) {
 	require("./add");
 	require("./reset");
 }

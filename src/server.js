@@ -93,9 +93,9 @@ module.exports = function (options = {}) {
 
 	let server = null;
 
-	if (Helper.config.public && (Helper.config.ldap || {}).enable) {
+	if (Helper.config.public && (Helper.config.ldap.enable || Helper.config.headerAuth.enable)) {
 		log.warn(
-			"Server is public and set to use LDAP. Set to private mode if trying to use LDAP authentication."
+			"Server is public and set to use LDAP / header authentication. Set to private mode if trying to use LDAP / header authentication."
 		);
 	}
 
@@ -179,7 +179,10 @@ module.exports = function (options = {}) {
 				performAuthentication.call(socket, {});
 			} else {
 				socket.on("auth:perform", performAuthentication);
-				socket.emit("auth:start", serverHash);
+				socket.emit("auth:start", {
+					serverHash,
+					headerAuthEnabled: Helper.config.headerAuth.enable && !Helper.config.public,
+				});
 			}
 		});
 
@@ -431,7 +434,7 @@ function initializeClient(socket, client, token, lastMessage, openChannel) {
 		}
 	});
 
-	if (!Helper.config.public && !Helper.config.ldap.enable) {
+	if (!Helper.config.public && !Helper.config.ldap.enable && !Helper.config.headerAuth.enable) {
 		socket.on("change-password", (data) => {
 			if (_.isPlainObject(data)) {
 				const old = data.old_password;
@@ -756,6 +759,7 @@ function getClientConfiguration() {
 
 	config.fileUpload = Helper.config.fileUpload.enable;
 	config.ldapEnabled = Helper.config.ldap.enable;
+	config.headerAuthEnabled = Helper.config.headerAuth.enable;
 
 	if (!config.lockNetwork) {
 		config.defaults = _.clone(Helper.config.defaults);
@@ -805,6 +809,10 @@ function performAuthentication(data) {
 	const socket = this;
 	let client;
 	let token = null;
+
+	if (!Helper.config.public && Helper.config.headerAuth.enable) {
+		data.user = socket.handshake.headers[Helper.config.headerAuth.header];
+	}
 
 	const finalInit = () =>
 		initializeClient(socket, client, token, data.lastMessage || -1, data.openChannel);
@@ -879,7 +887,7 @@ function performAuthentication(data) {
 		}
 
 		// If authorization succeeded but there is no loaded user,
-		// load it and find the user again (this happens with LDAP)
+		// load it and find the user again (this happens with LDAP and header auth)
 		if (!client) {
 			client = manager.loadUser(data.user);
 		}
